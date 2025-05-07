@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Expose the port Flask will run on (default is 5000)
-EXPOSE 5000
+# Expose the port Flask will run on (default is 8000)
+EXPOSE 8000
 
 # Set the environment variable to automatically load the environment variables from .env
 ENV FLASK_ENV=development
