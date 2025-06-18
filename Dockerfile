@@ -7,7 +7,7 @@ WORKDIR /app
 # Copy the current directory (where the Dockerfile resides) into the container's working directory
 COPY . /app
 
-# Install the system dependencies needed for the Flask app
+# Install the system dependencies needed for the FastAPI app
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -16,11 +16,15 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Expose the port Flask will run on (default is 8000)
+# Install Redis
+RUN apt-get update && apt-get install -y redis-server libmagic1
+
+# Expose the port FastAPI will run on
 EXPOSE 8000
 
-# Set the environment variable to automatically load the environment variables from .env
-ENV FLASK_ENV=development
+# Create a startup script
+RUN echo '#!/bin/bash\nservice redis-server start\ncelery -A celery_app worker --loglevel=info &\npython app.py' > /app/start.sh
+RUN chmod +x /app/start.sh
 
-# Command to run the Flask app when the container starts
-CMD ["python", "app.py"]
+# Command to run the startup script
+CMD ["/app/start.sh"]
