@@ -1,30 +1,12 @@
 import base64
-import json
-import os
-from dotenv import load_dotenv
-from openai import OpenAI
+import cv2
+import numpy as np
 
-# Load environment variables
-load_dotenv()
-
-# Initialize OpenAI client
-api_key = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=api_key)
-
-
-def encode_image(image_path):
+def encode_image(image_object):
     """
-    Encode an image file to a base64 string.
-    
-    :param image_path: Path to the image file
-    :return: Base64-encoded image string
+    Encode an image_object (numpy array) to a base64 string.
     """
-    try:
-        with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
-    except Exception as e:
-        raise RuntimeError(f"Failed to encode image: {str(e)}")
-
+    return base64.b64encode(image_object.tobytes()).decode('utf-8')
 
 def get_image_analysis(encoded_image):
     """

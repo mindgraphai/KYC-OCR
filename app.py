@@ -5,9 +5,11 @@ import uuid
 from image_processing import encode_image, get_image_analysis, process_response
 from celery_app import celery_app
 from auth import get_api_key
+from blur_check import image_preops
 
 # Constants
-TEMP_IMAGE_PATH = 'temp_image.jpg'
+UPLOAD_DIR = 'uploads'
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -20,35 +22,30 @@ app = FastAPI(
                 bind=True,
                 max_retries=3,
                 default_retry_delay=60)
-def process_image_task(self, image_data: bytes):
+def process_image_task(self, image_path: str):
     """
     Celery task to process an image using GPT-4 Vision model.
     """
     try:
-        # Save the image data temporarily
-        with open(TEMP_IMAGE_PATH, "wb") as buffer:
-            buffer.write(image_data)
+        # Run pre-processing
+        preops_result, preops_error = image_preops(image_path)
+        if preops_result is None:
+            # Store error for retrieval with 422 code
+            return {"error": preops_error, "status_code": 422}
 
-        # Process the image
-        encoded_image = encode_image(TEMP_IMAGE_PATH)
+        # Encode the processed image (JPEG bytes) to base64
+        encoded_image = encode_image(preops_result)
         openai_response = get_image_analysis(encoded_image)
         result = process_response(openai_response)
-        
-        # Clean up the result after processing
-        self.backend.delete(self.request.id)
-        
         return result
-
     except Exception as e:
-        # If task fails, retry up to 3 times
         try:
             self.retry(exc=e)
         except self.MaxRetriesExceededError:
-            return {"error": f"Image processing failed after 3 retries: {str(e)}"}
-
+            return {"error": f"Image processing failed after 3 retries: {str(e)}", "status_code": 500}
     finally:
-        if os.path.exists(TEMP_IMAGE_PATH):
-            os.remove(TEMP_IMAGE_PATH)
+        if os.path.exists(image_path):
+            os.remove(image_path)
 
 @app.post("/read_text")
 async def process_image(
@@ -60,20 +57,17 @@ async def process_image(
     Returns a task ID for tracking the processing status.
     """
     try:
-        # Read the image data
-        content = await image.read()
-        
-        # Generate a unique task ID
+        # Save the uploaded image to disk
         task_id = str(uuid.uuid4())
-        
+        image_path = os.path.join(UPLOAD_DIR, f"{task_id}_{image.filename}")
+        with open(image_path, "wb") as f:
+            f.write(await image.read())
         # Queue the task
-        task = process_image_task.apply_async(args=[content], task_id=task_id)
-        
+        task = process_image_task.apply_async(args=[image_path], task_id=task_id)
         return JSONResponse(
             status_code=202,
             content={"id": task_id}
         )
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to queue image: {str(e)}")
 
@@ -87,7 +81,6 @@ async def get_task_status(
     """
     try:
         task = celery_app.AsyncResult(task_id)
-        
         # Check task state
         if task.state == 'PENDING':
             return JSONResponse(
@@ -95,22 +88,26 @@ async def get_task_status(
                 content={"status": "Processing"}
             )
         elif task.state == 'SUCCESS':
+            result = task.result
+            if isinstance(result, dict) and result.get("status_code") == 422:
+                return JSONResponse(
+                    status_code=422,
+                    content={"error": result.get("error")}
+                )
             return JSONResponse(
                 status_code=200,
-                content=task.result
+                content=result
             )
         elif task.state == 'FAILURE':
             return JSONResponse(
-                status_code=400,
+                status_code=500,
                 content={"error": str(task.result)}
             )
         else:
-            # If task state is not one of the above, it's likely an invalid task
             return JSONResponse(
                 status_code=404,
                 content={"error": "Task ID not found"}
             )
-            
     except Exception as e:
         return JSONResponse(
             status_code=400,
