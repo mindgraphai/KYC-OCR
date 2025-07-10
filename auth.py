@@ -1,6 +1,5 @@
 from fastapi import Security, HTTPException, status
 from fastapi.security.api_key import APIKeyHeader
-from typing import Optional
 import os
 from dotenv import load_dotenv
 

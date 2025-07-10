@@ -6,6 +6,9 @@ from image_processing import encode_image, get_image_analysis, process_response
 from celery_app import celery_app
 from auth import get_api_key
 from blur_check import image_preops
+import json
+from openai import OpenAI
+import base64
 
 # Constants
 UPLOAD_DIR = 'uploads'
@@ -17,6 +20,8 @@ app = FastAPI(
     description="API for processing images using GPT-4 Vision model",
     version="1.0.0"
 )
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @celery_app.task(name='image_processing.process_image_task', 
                 bind=True,
@@ -44,8 +49,10 @@ def process_image_task(self, image_path: str):
         except self.MaxRetriesExceededError:
             return {"error": f"Image processing failed after 3 retries: {str(e)}", "status_code": 500}
     finally:
-        if os.path.exists(image_path):
+        try:
             os.remove(image_path)
+        except FileNotFoundError:
+            pass
 
 @app.post("/read_text")
 async def process_image(
