@@ -5,8 +5,17 @@ import json
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
+from xml.parsers.expat import model
+
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Initialize OpenRouter client (OpenAI-compatible)
+api_key = os.getenv("OPENROUTER_API_KEY")
+api_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+client = OpenAI(
+    api_key=api_key,
+    base_url=api_url
+)
 
 def encode_image(image_object):
     """
@@ -22,17 +31,18 @@ def encode_image(image_object):
 
 def get_image_analysis(encoded_image):
     """
-    Send a base64-encoded image to OpenAI's GPT-4 Vision model for analysis.
+    Send a base64-encoded image to the selected model for analysis.
     Args:
         encoded_image: Base64-encoded image string
     Returns:
         OpenAI API response object or raises RuntimeError on error
     """
     base64_image_data = f"data:image/jpg;base64,{encoded_image}"
+    model = os.getenv("OPENROUTER_MODEL", "gpt-4o")
 
     try:
         response = client.chat.completions.create(
-            model='gpt-4o',
+            model=model,
             messages=[
                 {
                     "role": "user",

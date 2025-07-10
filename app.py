@@ -21,8 +21,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 @celery_app.task(name='image_processing.process_image_task', 
                 bind=True,
                 max_retries=3,

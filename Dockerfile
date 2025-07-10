@@ -7,7 +7,7 @@ WORKDIR /app
 # Copy the current directory (where the Dockerfile resides) into the container's working directory
 COPY . /app
 # Copy .env file if present
-COPY .env /app/.env
+COPY .env.example /app/.env.example
 
 # Install the system dependencies needed for the FastAPI app
 RUN apt-get update && apt-get install -y \
