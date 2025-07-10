@@ -1,5 +1,5 @@
 # Use a lightweight Python image from the official Docker repository
-FROM python:3.9-slim
+FROM python:3.10-slim
 
 # Set the working directory inside the container
 WORKDIR /app
